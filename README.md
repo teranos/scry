@@ -2,19 +2,30 @@
 
 Local LLM inference via llama.cpp with Metal acceleration. C++ because llama.cpp is C++ — direct sampler chain access for custom logit processors (#715), live visualization of logits/attention during generation (#716), and branching on alternative token paths (#717).
 
+## Build
+
+Scry speaks QNTX's plugin protocol: `plugin/grpc/protocol/{sigil,domain,llm,atsstore}.proto` and `proto.cmake` there are compiled into the binary. `flake.nix` takes QNTX as a source input, pinned in `flake.lock`, and hands CMake its path as `QNTX_SRC`. llama.cpp is the `vendor/llama.cpp` submodule; the flake fetches the same commit itself.
+
+```
+nix build
+```
+
+Without nix, CMake wants a QNTX checkout and the submodule:
+
+```
+git submodule update --init
+make install QNTX_SRC=/path/to/QNTX
+```
+
 ## Configuration
 
-In `am.toml`:
+Scry is its record on the node ([ADR-002](https://github.com/teranos/QNTX/blob/main/docs/adr/ADR-002-plugin-configuration.md)): `plugins_add https://github.com/teranos/scry`, `PUT /api/plugins/scry/config` with the keys below, `plugins_enable`. The record's `build.*` keys for this repository: `build.core` `github.com/teranos/scry@main`, `build.command` `nix build`, `build.output` `result/bin/qntx-scry-plugin`.
 
-```toml
-[Plugin]
-enabled = ["scry"]
-
-[scry]
-model_path = "/path/to/model.gguf"
-n_ctx = "2048"
-log_level = "info"  # error | warn | info | debug
-```
+| Key | |
+|---|---|
+| `model_path` | The GGUF to load. |
+| `n_ctx` | Context window. 2048 when unset. |
+| `log_level` | `error`, `warn`, `info` or `debug`. `info` when unset. |
 
 ## Architecture
 

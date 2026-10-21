@@ -4,17 +4,21 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    # The protocol scry speaks is QNTX's: plugin/grpc/protocol/*.proto and
+    # proto.cmake there. QNTX is taken as source, not as a flake, so none of
+    # its inputs are fetched; flake.lock pins the rev.
+    qntx = {
+      url = "github:teranos/QNTX";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, qntx }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
 
-        # Proto files live outside the plugin directory
-        protoSrc = ../../plugin/grpc/protocol;
-
-        # llama.cpp pinned to the same commit as the git submodule
+        # llama.cpp pinned to the commit the vendor/llama.cpp submodule points at
         llama-cpp-src = pkgs.fetchFromGitHub {
           owner = "ggml-org";
           repo = "llama.cpp";
@@ -43,8 +47,11 @@
           version = self.rev or "dev";
           src = ./.;
 
+          # vendor/llama.cpp is a submodule: a checkout without it leaves the
+          # directory empty, and cp -r into an existing directory nests.
           postUnpack = ''
             mkdir -p $sourceRoot/vendor
+            rm -rf $sourceRoot/vendor/llama.cpp
             cp -r ${llama-cpp-src} $sourceRoot/vendor/llama.cpp
             cp -r ${glm-src} $sourceRoot/vendor/glm
             cp -r ${metal-cpp-src} $sourceRoot/vendor/metal-cpp
@@ -67,7 +74,7 @@
 
           cmakeFlags = [
             "-DCMAKE_BUILD_TYPE=Release"
-            "-DPROTO_DIR=${protoSrc}"
+            "-DQNTX_SRC=${qntx}"
           ];
 
           doCheck = true;
